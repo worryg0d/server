@@ -25,6 +25,7 @@ func HandleFuncFADE(path string, f func(http.ResponseWriter, *http.Request)) {
 	for _, val := range dirEnrtry {
 		if val.IsDir() {
 			HandleFuncFADE(path+"/"+val.Name(), f)
+			continue
 		}
 		http.HandleFunc(path[1:]+"/"+val.Name(), f)
 	}
