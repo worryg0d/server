@@ -6,6 +6,36 @@ import (
 	"os"
 )
 
+func Explorer(path string) {
+	dirEntry, err := os.ReadDir(path)
+	if err != nil {
+		panic(err)
+	}
+	for _, val := range dirEntry {
+		if val.IsDir() {
+			http.HandleFunc(path[1:]+"/"+val.Name()+"/", PrintDir)
+			Explorer(path + "/" + val.Name())
+		}
+	}
+}
+
+func PrintDir(w http.ResponseWriter, req *http.Request) {
+	path := "." + req.URL.RequestURI()
+	dirEntry, err := os.ReadDir(path)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Fprint(w, "<html style=\"font-size: 14pt\">")
+	for _, val := range dirEntry {
+		if val.IsDir() {
+			fmt.Fprintf(w, "<a href=\"%s\">%s</a><br/>", path[1:]+val.Name()+"/", val.Name())
+			continue
+		}
+		fmt.Fprintf(w, "<a href=\"%s\">%s</a><br/>", path[1:]+val.Name(), val.Name())
+	}
+	fmt.Fprintf(w, "</html>")
+}
+
 func PrintFile(w http.ResponseWriter, req *http.Request) {
 	path := "." + req.URL.RequestURI()
 	data, err := os.ReadFile(path)
@@ -33,5 +63,7 @@ func HandleFuncFADE(path string, f func(http.ResponseWriter, *http.Request)) {
 
 func main() {
 	HandleFuncFADE(".", PrintFile)
+	http.HandleFunc("/", PrintDir)
+	Explorer(".")
 	http.ListenAndServe(":8080", nil)
 }
