@@ -23,7 +23,6 @@ func explorer(path string) error {
 			}
 			handlersList[p] = struct{}{}
 			http.HandleFunc(p[1:]+"/", printDir)
-			log.Printf("registered hanlder for folder, pattern: %s", p[1:])
 			explorer(path + "/" + val.Name())
 		}
 	}
@@ -90,7 +89,6 @@ func registerFilesHandlers(path string, f func(http.ResponseWriter, *http.Reques
 		handlersList[p] = struct{}{}
 
 		http.HandleFunc(p[1:], f)
-		log.Printf("registered handler for file, pattern: %s\n", p[1:])
 	}
 
 	return nil
