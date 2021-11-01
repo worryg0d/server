@@ -7,6 +7,8 @@ import (
 	"os"
 )
 
+var handlersList = make(map[string]struct{})
+
 func explorer(path string) error {
 	dirEntry, err := os.ReadDir(path)
 	if err != nil {
@@ -15,7 +17,13 @@ func explorer(path string) error {
 	}
 	for _, val := range dirEntry {
 		if val.IsDir() {
-			http.HandleFunc(path[1:]+"/"+val.Name()+"/", printDir)
+			p := path+"/"+val.Name()+"/"
+			if _, ok := handlersList[p]; ok {
+				continue
+			}
+			handlersList[p] = struct{}{}
+			http.HandleFunc(p[1:]+"/", printDir)
+			log.Printf("registered hanlder for folder, pattern: %s", p[1:])
 			explorer(path + "/" + val.Name())
 		}
 	}
@@ -28,10 +36,10 @@ func printDir(w http.ResponseWriter, req *http.Request) {
 
 	if err != nil {
 		http.Error(w,
-			fmt.Sprintf("cannot read dir on (Path: %s). rr: %s", path, err.Error()),
+			fmt.Sprintf("cannot print dir on (Path: %s), err: %s", path, err.Error()),
 			http.StatusInternalServerError,
 		)
-		log.Printf("cannot read dir (Path: %s), err: %s", path, err.Error())
+		log.Printf("cannot print dir (Path: %s), err: %s", path, err.Error())
 		return
 	}
 
@@ -71,32 +79,43 @@ func registerFilesHandlers(path string, f func(http.ResponseWriter, *http.Reques
 		return err
 	}
 	for _, val := range dirEntries {
+		p := path+"/"+val.Name()
 		if val.IsDir() {
-			registerFilesHandlers(path+"/"+val.Name(), f)
+			registerFilesHandlers(p, f)
 			continue
 		}
-		http.HandleFunc(path[1:]+"/"+val.Name(), f)
+		if _, ok := handlersList[p]; ok {
+			continue
+		}
+		handlersList[p] = struct{}{}
+
+		http.HandleFunc(p[1:], f)
+		log.Printf("registered handler for file, pattern: %s\n", p[1:])
 	}
 
 	return nil
 }
 
+func registerHandlersInRealTime(path string)  {
+	for {
+		err := registerFilesHandlers(path, printFile)
+		if err != nil {
+			log.Fatalln(err)
+		}
+
+		err = explorer(path)
+		if err != nil {
+			log.Fatalln(err)
+		}
+	}
+}
+
 func main() {
 
-	err := registerFilesHandlers(".", printFile)
-	if err != nil {
-		log.Fatalln(err)
-	}
-
 	http.HandleFunc("/", printDir)
-
-	err = explorer(".")
-	if err != nil {
-		log.Fatalln(err)
-	}
-
+	go registerHandlersInRealTime(".")
 	log.Printf("Server is starting on port: 8080")
-	err = http.ListenAndServe(":8080", nil)
+	err := http.ListenAndServe(":8080", nil)
 
 	if err != nil {
 		log.Fatalf("cannot start server. Error: %s", err.Error())
